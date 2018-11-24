@@ -1,158 +1,132 @@
-# Intro 
+# DeepMimic Environments Setup
 
-Code accompanying the SIGGRAPH 2018 paper:
-"DeepMimic: Example-Guided Deep Reinforcement Learning of Physics-Based Character Skills".
-The framework uses reinforcement learning to train a simulated humanoid to imitate a variety
-of motion skills from mocap data.
+Somedaywilldo
 
-Project page: https://xbpeng.github.io/projects/DeepMimic/index.html
+## C Libraries
 
-![Skills](images/teaser.png)
+### OpenGL (This includes freeglut and glew)
 
-## Dependencies
-C++:
-- Bullet 2.87 (https://github.com/bulletphysics/bullet3/releases)
-- Eigen (http://www.eigen.tuxfamily.org/index.php?title=Main_Page)
-- OpenGL >= 3.2
-- freeglut (http://freeglut.sourceforge.net/)
-- glew (http://glew.sourceforge.net/)
-
-Python:
-- Python 3
-- PyOpenGL (http://pyopengl.sourceforge.net/)
-- Tensorflow (https://www.tensorflow.org/)
-- MPI4Py (https://mpi4py.readthedocs.io/en/stable/install.html)
-
-Misc:
-- SWIG (http://www.swig.org/)
-- MPI 
-	- Windows: https://docs.microsoft.com/en-us/message-passing-interface/microsoft-mpi
-	- Linux: `sudo apt install libopenmpi-dev`
-
-## Build
-The simulated environments are written in C++, and the python wrapper is built using SWIG.
-To install the python dependencies, run
-```
-pip install -r requirements.txt
-```
-Note that MPI must be installed before MPI4Py. When building Bullet, be sure to disable double precision with the build flag `USE_DOUBLE_PRECISION=OFF`.
-
-### Windows
-The wrapper is built using `DeepMimicCore.sln`.
-
-1. Select the `x64` configuration from the configuration manager.
-
-2. Under the project properties for `DeepMimicCore` modify `Additional Include Directories` to specify
-	- Bullet source directory
-	- Eigen include directory
-	- python include directory
-
-3. Modify `Additional Library Directories` to specify
-	- Bullet lib directory
-	- python lib directory
-
-4. Build `DeepMimicCore` project with the `Release_Swig` configuration and this should
-generate `DeepMimicCore.py` in `DeepMimicCore/`.
-
-
-### Linux
-1. Modify the `Makefile` in `DeepMimicCore/` by specifying the following,
-	- `EIGEN_DIR`: Eigen include directory
-	- `BULLET_INC_DIR`: Bullet source directory
-	- `PYTHON_INC`: python include directory
-	- `PYTHON_LIB`: python lib directory
-
-2. Build wrapper,
-	```
-	make python
-	```
-This should generate `DeepMimicCore.py` in `DeepMimicCore/`
-
-
-## How to Use
-Once the python wrapper has been built, training is done entirely in python using Tensorflow.
-`DeepMimic.py` runs the visualizer used to view the simulation. Training is done with `mpi_run.py`, 
-which uses MPI to parallelize training across multiple processes.
-
-`DeepMimic.py` is run by specifying an argument file that provides the configurations for a scene.
-For example,
-```
-python DeepMimic.py --arg_file args/run_humanoid3d_spinkick_args.txt
+```bash
+$ sudo apt-get install cmake libx11-dev xorg-dev libglu1-mesa-dev freeglut3-dev libglew1.5 libglew1.5-dev libglu1-mesa 
 ```
 
-will run a pre-trained policy for a spinkick. Similarly,
-```
-python DeepMimic.py --arg_file args/kin_char_args.txt
-```
+### Eigen (Build on source)
 
-will load and play a mocap clip.
-
-
-To train a policy, run `mpi_run.py` by specifying an argument file and the number of worker processes.
-For example,
-```
-python mpi_run.py --arg_file args/train_humanoid3d_spinkick_args.txt --num_workers 4
+```bash
+$ git clone https://github.com/eigenteam/eigen-git-mirror
+$ mkdir build
+$ cmake ../
+$ sudo make install
 ```
 
-will train a policy to perform a spinkick using 4 workers. As training progresses, it will regularly
-print out statistics and log them to `output/` along with a `.ckpt` of the latest policy.
-It typically takes about 60 millions samples to train one policy, which can take a day
-when training with 16 workers. 16 workers is likely the max number of workers that the
-framework can support, and it can get overwhelmed if too many workers are used.
+### Bullet
 
-A number of argument files are already provided in `args/` for the different skills. 
-`train_[something]_args.txt` files are setup for `mpi_run.py` to train a policy, and 
-`run_[something]_args.txt` files are setup for `DeepMimic.py` to run one of the pretrained policies.
-To run your own policies, take one of the `run_[something]_args.txt` files and specify
-the policy you want to run with `--model_file`. Make sure that the reference motion `--motion_file`
-corresponds to the motion that your policy was trained for, otherwise the policy will not run properly.
-
-
-## Interface
-- the plot on the top-right shows the predictions of the value function
-- right click and drag will pan the camera
-- left click and drag will apply a force on the character at a particular location
-- scrollwheel will zoom in/out
-- pressing 'r' will reset the episode
-- pressing 'l' will reload the argument file and rebuild everything
-- pressing 'x' will pelt the character with random boxes
-- pressing space will pause/resume the simulation
-- pressing '>' will step the simulation one step at a time
-
-
-## Mocap Data
-Mocap clips are located in `data/motions/`. To play a clip, first modify 
-`args/kin_char_args.txt` and specify the file to play with
-`--motion_file`, then run
-```
-python DeepMimic.py --arg_file args/kin_char_args.txt
+```bash
+$ git clone https://github.com/bulletphysics/bullet3
+$ cd bullet3
+$ vi build_cmake_pybullet_double.sh
 ```
 
-The motion files follow the JSON format. The `"Loop"` field specifies whether or not the motion is cyclic.
-`"wrap"` specifies a cyclic motion that will wrap back to the start at the end, while `"none"` specifies an
-acyclic motion that will stop once it reaches the end of the motion. Each vector in the `"Frames"` list
-specifies a keyframe in the motion. Each frame has the following format:
-```
-[
-	duration of frame in seconds (1D),
-	root position (3D),
-	root rotation (4D),
-	chest rotation (4D),
-	neck rotation (4D),
-	right hip rotation (4D),
-	right knee rotation (1D),
-	right ankle rotation (4D),
-	right shoulder rotation (4D),
-	right elbow rotation (1D),
-	left hip rotation (4D),
-	left knee rotation (1D),
-	left ankle rotation (4D),
-	left shoulder rotation (4D),
-	left elbow rotation (1D)
-]
+This is important, in **build_cmake_pybullet_double.sh**, change line 8  "-DUSE_DOUBLE_PRECISION=ON" to " -DUSE_DOUBLE_PRECISION=OFF" like following:
+
+```bash
+$ cmake -DBUILD_PYBULLET=ON -DBUILD_PYBULLET_NUMPY=ON -DUSE_DOUBLE_PRECISION=OFF -DBT_USE_EGL=ON -DCMAKE_BUILD_TYPE=Release .. || exit 1
 ```
 
-Positions are specified in meters, 3D rotations for spherical joints are specified as quaternions `(w, x, y ,z)`,
-and 1D rotations for revolute joints (e.g. knees and elbows) are represented with a scalar rotation in radians. The root
-positions and rotations are in world coordinates, but all other joint rotations are in the joint's local coordinates.
-To use your own motion clip, convert it to a similar style JSON file.
+Then run these:
+
+```bash
+$ sh build_cmake_pybullet_double.sh
+$ cd build_cmake
+$ sudo make install
+```
+
+### Swig and MPI
+
+```bash
+$ sudo apt-get install swig
+$ sudo apt install libopenmpi-dev
+```
+
+### Clang
+
+```bash
+$ sudo apt-get install clang
+```
+
+I don't know if g++ also works, it's just weird to use clang in Ubuntu. 
+
+## Python Libraries
+
+Notice: C libraries must be installed first. All in Python3. Tensorflow-gpu is not required.
+
+Just go to the **DeepMimic/** :
+
+```bash
+$ sudo pip install -r requirements.txt
+```
+
+
+
+## Hacks (IMPORTANT)
+
+Before building DeepMimic, we need adjust **~/.bashrc** and **Makefile** first.
+
+### ~/.bashrc
+
+Some paths maybe useless, just in case. 
+
+```bash
+LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib"
+LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib" #My eigen and bullet is here
+PYTHONPATH="$PYTHONPATH:/usr/include/python3.5m"
+PYTHONPATH="$PYTHONPATH:/usr/local/lib"
+```
+
+The **LD_LIBRARY_PATH** is for this error:
+
+```
+ImportError: libBulletDynamics.so.2.88 ..........
+```
+
+### Makefile 
+
+```bash
+  6 LOCAL_DIR = /usr/local # modified: added for my bullet and eigen lib
+  7
+  8 EIGEN_DIR = /usr/local/include/eigen3
+  9 BULLET_INC_DIR = /usr/local/include/bullet
+ 10
+ 11 PYTHON_INC = /usr/include/python3.5m
+ 12 PYTHON_LIB = /usr/lib/ -lpython3.5m
+ 13
+ 14 INC = -I./ \
+ 15     -I$(LOCAL_DIR) \ # modified
+ 16     -I$(EIGEN_DIR) \
+ 17     -I$(BULLET_INC_DIR)
+ 18
+ 19 LIBS = -lGLEW -lGL -lGLU -lglut -lBulletDynamics -lBulletCollision -lLi    nearMath -lm -lstdc++
+```
+
+
+
+### Build and Run
+
+Now build the DeepMimic: (for life is short, add an -j8 to make)
+
+```bash
+$ cd DeepMimic
+$ cd DeepMimicCore
+$ make -j8 python 
+```
+
+Then these should be runnable, inside **mpi_run.py**, some line may need to be changed (modify python to python3)
+
+```bash
+$ python3 DeepMimic.py --arg_file args/run_humanoid3d_spinkick_args.txt
+$ python3 DeepMimic.py --arg_file args/kin_char_args.txt
+$ python3 mpi_run.py --arg_file args/train_humanoid3d_spinkick_args.txt --num_workers 4
+```
+
+And if these don't work, I have no idea : )
+
